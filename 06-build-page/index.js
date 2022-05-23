@@ -3,14 +3,14 @@ const  path  = require('path');
 
 const projectDist=path.join(__dirname,'project-dist');
 
+
 async function removeFolder(where){
   return fs.promises
     .rm(where,{recursive:true,force:true})
     .catch(err=>console.log('Err removeFolder',err.message));
 }
-async function createFolder(where){
-  fs.promises.mkdir(where, { recursive: true })
-    .catch(err=>console.log('Err createCopyFolder',err.message));
+async function createFile(where,what){
+  return fs.promises.open(path.join(where,what),'a');
 }
 async function copyFiles(from,to){
   fs.promises.readdir(from,{ withFileTypes: true })
@@ -34,25 +34,16 @@ async function copyFiles(from,to){
     })
     .catch(err=>console.log('Err readdir',err.message));
 }
-async function createProjectDist(){
-  return fs.promises.mkdir(projectDist, { recursive: true })
+async function createFolder(where){
+  fs.promises.mkdir(where, { recursive: true })
     .catch(err=>console.log('Err createCopyFolder',err.message));
 }
-async function removeOldStyles(){
-  //Удаляем старый файл со стилями
-  return fs.promises
-    .rm(path.join(__dirname,'project-dist','styles.css'),{recursive:true,force:true})
-    .catch(err=>console.log('Err removeFolder',err.message));
-}
-async function createCssBundle(){
-  return fs.promises.open(path.join(__dirname,'project-dist','styles.css'),'a');
-}
-async function copyStyles(){
+async function makeCssBundle(){
   //Читаем файлы в папке styles
   fs.promises.readdir(path.join(__dirname,'styles'),{ withFileTypes: true })
     .then((files)=>{
       files.forEach(file=>{
-        const pathToBundle=path.join(__dirname,'project-dist','styles.css');
+        const pathToBundle=path.join(__dirname,'project-dist','style.css');
         let pathToFile=path.join(__dirname,'styles',file.name);
         if(file.name.split('.')[1]==='css'){
           //Проверка на сss
@@ -75,15 +66,42 @@ async function copyStyles(){
       throw('Err with fs.promises.readdir',err.message);
     });
 }
+async function scanComponents(where){
+  fs.promises.readdir(where)
+    .then(files=>{
+      fs.promises.readFile(path.join(__dirname,'project-dist','index.html'),'utf-8')
+        .then(innderHTML=>{
+          files.forEach(file=>{
+            if(innderHTML.includes(`{{${path.basename(file,path.extname(file))}}}`)){
+              fs.promises.readFile(path.join(where,file),'utf-8')
+                .then((componentHTML)=>{
+                  innderHTML=innderHTML.replace(`{{${path.basename(file,path.extname(file))}}}`,componentHTML);
+                  fs.promises.writeFile(path.join(__dirname,'project-dist','index.html'),innderHTML);
+                });
+              //Тут я уже устал, опишу потом...
+            }
+          });
+        });
+    });  
+  
+}
+
 function init(){
-  createProjectDist()
-    .then(()=>removeOldStyles())
-    .then(()=>createCssBundle())
-    .then(()=>copyStyles())
-    .then(()=>removeFolder(path.join(__dirname,'project-dist','assets')))
+  removeFolder(projectDist)
+    .then(()=> createFolder(projectDist))
+    .then(()=>createFile(projectDist,'style.css'))
+    .then(()=>makeCssBundle())
+    .then(()=>{
+      fs.promises.copyFile(path.join(__dirname,'template.html'),
+        path.join(__dirname,'project-dist','index.html'));
+    })
     .then(()=>createFolder(path.join(__dirname,'project-dist','assets')))
     .then(()=>copyFiles(
       path.join(__dirname,'assets'),
-      path.join(__dirname,'project-dist','assets')));
+      path.join(__dirname,'project-dist','assets')))
+    .then(()=>scanComponents(path.join(__dirname,'components')));
+ 
+  
+    
 }
 init();
