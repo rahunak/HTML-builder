@@ -7,7 +7,8 @@ const projectDist=path.join(__dirname,'project-dist');
 async function removeFolder(where){
   return fs.promises
     .rm(where,{recursive:true,force:true})
-    .catch(err=>console.log('Err removeFolder',err.message));
+    .catch(err=>console.log('Err removeFolder - Иногда вылазит ошибка, я хз почему. Перезапуск VSCode всегда помогает, ошибка пропадает',err.message));
+    
 }
 async function createFile(where,what){
   return fs.promises.open(path.join(where,what),'a');
